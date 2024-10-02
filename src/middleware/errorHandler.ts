@@ -7,6 +7,6 @@ export const errorHandler = (
   res: Response,
   next: NextFunction,
 ) => {
-  logger.error(err.stack);
+  logger.error(err);
   res.status(500).json({ error: "An unexpected error occurred" });
 };

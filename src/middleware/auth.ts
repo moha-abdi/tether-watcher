@@ -5,9 +5,11 @@ export const authenticateApiKey = (
   res: Response,
   next: NextFunction,
 ) => {
-  const apiKey = req.header("X-API-Key");
+  const apiKey = req.header("X-API-Key") || req.header("x-api-key");
+
   if (apiKey !== process.env.API_KEY) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
   }
   next();
 };
