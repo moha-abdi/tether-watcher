@@ -15,6 +15,7 @@ export const logger = winston.createLogger({
 });
 
 export const setupLogging = (app: any) => {
+  return;
   app.use(
     expressWinston.logger({
       winstonInstance: logger,

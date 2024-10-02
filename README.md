@@ -54,6 +54,7 @@ This is a service that watches for TRON (TRC20) USDT transactions and triggers a
    USDT_CONTRACT_ADDRESS="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
    USDT_DEPOSIT_ADDRESS="YOUR USDT TRC-20 ADDRESS"
    API_KEY="your-secure-api-key"
+   WEBHOOK_SECRET="your-secure-webhook-secret"
    ```
 
 4. Build the project:
@@ -105,6 +106,23 @@ Request body:
 3. **Expired Transactions**: Transactions are given a 5-minute window to be completed. If they expire, a webhook is sent notifying the user that the transaction has expired.
 
 4. **Webhook Notification**: When a transaction is completed or expired, the service sends a POST request to the provided webhook URL with details of the transaction.
+
+### Webhook Signature
+
+To ensure secure communication, each webhook request includes an `X-Webhook-Signature` header. The signature is generated using HMAC-SHA256 and a secret key (`WEBHOOK_SECRET`). This allows the receiving server to verify that the webhook request came from a trusted source.
+
+To generate the signature, the payload is hashed using the `WEBHOOK_SECRET`:
+
+```typescript
+import crypto from "crypto";
+
+function generateSignature(payload: string): string {
+  return crypto
+    .createHmac("sha256", process.env.WEBHOOK_SECRET!)
+    .update(payload)
+    .digest("hex");
+}
+```
 
 ## Contributing
 
