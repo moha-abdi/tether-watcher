@@ -4,8 +4,8 @@ import BigNumber from "bignumber.js";
 import { sendWebhook } from "../utils/webhook";
 
 export enum Network {
-  TRON = "TRON",
-  BSC = "BSC",
+  TRC20 = "TRC20",
+  BEP20 = "BEP20",
 }
 
 export enum TransactionStatus {
@@ -96,8 +96,8 @@ export class TetherWatcher {
   private watchedTransactions: Map<string, WatchedTransaction> = new Map();
   private processedEvents: Map<string, ProcessedEvent> = new Map();
   private lastProcessedBlocks: Record<Network, bigint> = {
-    [Network.TRON]: BigInt(0),
-    [Network.BSC]: BigInt(0),
+    [Network.TRC20]: BigInt(0),
+    [Network.BEP20]: BigInt(0),
   };
   private pendingConfirmations = new Map<
     string,
@@ -119,7 +119,7 @@ export class TetherWatcher {
   }
 
   private initializeNetworkConfigs() {
-    this.networkConfigs.set(Network.TRON, {
+    this.networkConfigs.set(Network.TRC20, {
       enabled: true,
       isTestnet: this.isTestMode,
       rpcUrl: this.isTestMode
@@ -136,7 +136,7 @@ export class TetherWatcher {
       retryInterval: 10000,
     });
 
-    this.networkConfigs.set(Network.BSC, {
+    this.networkConfigs.set(Network.BEP20, {
       enabled: true,
       isTestnet: this.isTestMode,
       rpcUrl: this.isTestMode
@@ -159,23 +159,23 @@ export class TetherWatcher {
   private initializeClients() {
     try {
       // Initialize TRON
-      const tronConfig = this.networkConfigs.get(Network.TRON)!;
+      const tronConfig = this.networkConfigs.get(Network.TRC20)!;
       this.tronWeb = new TronWeb({
         fullHost: tronConfig.rpcUrl,
         headers: { "TRON-PRO-API-KEY": process.env.TRON_PRO_API_KEY! },
       });
 
       // Initialize BSC with ethers
-      const bscConfig = this.networkConfigs.get(Network.BSC)!;
+      const bscConfig = this.networkConfigs.get(Network.BEP20)!;
       const bscProvider = new ethers.JsonRpcProvider(bscConfig.rpcUrl);
-      this.providers.set(Network.BSC, bscProvider);
+      this.providers.set(Network.BEP20, bscProvider);
 
       const bscContract = new ethers.Contract(
         bscConfig.contractAddress,
         USDT_ABI,
         bscProvider,
       );
-      this.contracts.set(Network.BSC, bscContract);
+      this.contracts.set(Network.BEP20, bscContract);
 
       console.info("Network clients initialized successfully");
     } catch (error) {
@@ -198,9 +198,9 @@ export class TetherWatcher {
 
       for (const network of this.networkConfigs.keys()) {
         if (this.networkConfigs.get(network)!.enabled) {
-          if (network === Network.TRON) {
+          if (network === Network.TRC20) {
             this.watchTronTransactions();
-          } else if (network === Network.BSC) {
+          } else if (network === Network.BEP20) {
             this.watchBscTransactions();
           }
         }
@@ -296,7 +296,7 @@ export class TetherWatcher {
     while (this.isWatching) {
       try {
         await this.checkPendingConfirmations();
-        const config = this.networkConfigs.get(Network.TRON)!;
+        const config = this.networkConfigs.get(Network.TRC20)!;
         const events = await this.tronWeb.event.getEventsByContractAddress(
           config.contractAddress,
           {
@@ -313,7 +313,7 @@ export class TetherWatcher {
               currentBlock.block_header.raw_data.number,
             );
           }
-          this.lastProcessedBlocks[Network.TRON] = BigInt(
+          this.lastProcessedBlocks[Network.TRC20] = BigInt(
             currentBlock.block_header.raw_data.number,
           );
         }
@@ -332,14 +332,14 @@ export class TetherWatcher {
     while (this.isWatching) {
       try {
         await this.checkPendingConfirmations();
-        const config = this.networkConfigs.get(Network.BSC)!;
-        const provider = this.providers.get(Network.BSC)!;
-        const contract = this.contracts.get(Network.BSC)!;
+        const config = this.networkConfigs.get(Network.BEP20)!;
+        const provider = this.providers.get(Network.BEP20)!;
+        const contract = this.contracts.get(Network.BEP20)!;
 
         const currentBlock = await provider.getBlockNumber();
         const fromBlock = Math.max(
           currentBlock - 100,
-          Number(this.lastProcessedBlocks[Network.BSC] ?? currentBlock - 100),
+          Number(this.lastProcessedBlocks[Network.BEP20] ?? currentBlock - 100),
         );
 
         const filter = contract.filters.Transfer();
@@ -353,7 +353,7 @@ export class TetherWatcher {
           await this.processBscEvent(event, BigInt(currentBlock));
         }
 
-        this.lastProcessedBlocks[Network.BSC] = BigInt(currentBlock);
+        this.lastProcessedBlocks[Network.BEP20] = BigInt(currentBlock);
         await new Promise((resolve) =>
           setTimeout(resolve, config.retryInterval),
         );
@@ -374,7 +374,7 @@ export class TetherWatcher {
       const value = new BigNumber(event.result.value);
 
       await this.processTransferEvent(
-        Network.TRON,
+        Network.TRC20,
         from,
         to,
         value,
@@ -388,7 +388,7 @@ export class TetherWatcher {
         blockNumber: event.block_number,
         processedAt: Date.now(),
         confirmations: currentBlock - event.block_number,
-        network: Network.TRON,
+        network: Network.TRC20,
       });
     } catch (error) {
       console.error(`Error processing TRON event ${eventKey}:`, error);
@@ -411,7 +411,7 @@ export class TetherWatcher {
       const value = new BigNumber(args[2].toString());
 
       await this.processTransferEvent(
-        Network.BSC,
+        Network.BEP20,
         from,
         to,
         value,
@@ -425,7 +425,7 @@ export class TetherWatcher {
         blockNumber: event.blockNumber,
         processedAt: Date.now(),
         confirmations: Number(currentBlock) - event.blockNumber,
-        network: Network.BSC,
+        network: Network.BEP20,
       });
     } catch (error) {
       console.error(`Error processing BSC event ${eventKey}:`, error);
@@ -456,7 +456,7 @@ export class TetherWatcher {
       if (tx.network === network && fromMatches && toMatches && valueMatches) {
         const confirmations =
           currentBlock -
-          (network === Network.TRON
+          (network === Network.TRC20
             ? event.block_number
             : Number(event.blockNumber));
 
@@ -469,11 +469,11 @@ export class TetherWatcher {
           this.pendingConfirmations.set(id, {
             network,
             transactionHash:
-              network === Network.TRON
+              network === Network.TRC20
                 ? event.transaction_id
                 : event.transactionHash,
             blockNumber:
-              network === Network.TRON
+              network === Network.TRC20
                 ? event.block_number
                 : Number(event.blockNumber),
           });
@@ -482,11 +482,11 @@ export class TetherWatcher {
 
         try {
           const transactionHash =
-            network === Network.TRON
+            network === Network.TRC20
               ? event.transaction_id
               : event.transactionHash;
           const blockNumber =
-            network === Network.TRON
+            network === Network.TRC20
               ? event.block_number
               : Number(event.blockNumber);
 
@@ -520,8 +520,10 @@ export class TetherWatcher {
     if (this.pendingConfirmations.size === 0) return;
 
     const currentBlockNumbers = {
-      [Network.BSC]: await this.providers.get(Network.BSC)!.getBlockNumber(),
-      [Network.TRON]: (await this.tronWeb.trx.getCurrentBlock()).block_header
+      [Network.BEP20]: await this.providers
+        .get(Network.BEP20)!
+        .getBlockNumber(),
+      [Network.TRC20]: (await this.tronWeb.trx.getCurrentBlock()).block_header
         .raw_data.number,
     };
 
@@ -567,7 +569,7 @@ export class TetherWatcher {
       let isValid = false;
       let txStatus = false;
 
-      if (network === Network.TRON) {
+      if (network === Network.TRC20) {
         const block = await this.tronWeb.trx.getBlock(blockNumber);
         const txInfo = await this.tronWeb.trx.getTransaction(transactionHash);
 
@@ -588,8 +590,8 @@ export class TetherWatcher {
           );
           return;
         }
-      } else if (network === Network.BSC) {
-        const provider = this.providers.get(Network.BSC)!;
+      } else if (network === Network.BEP20) {
+        const provider = this.providers.get(Network.BEP20)!;
         const block = await provider.getBlock(blockNumber);
         const receipt = await provider.getTransactionReceipt(transactionHash);
 
@@ -618,7 +620,7 @@ export class TetherWatcher {
       // Verify the transfer event still exists in the transaction receipt
       let eventExists = false;
       try {
-        if (network === Network.TRON) {
+        if (network === Network.TRC20) {
           const events =
             await this.tronWeb.event.getEventsByTransactionID(transactionHash);
           eventExists =
@@ -626,13 +628,13 @@ export class TetherWatcher {
               (event) =>
                 event.event_name === "Transfer" &&
                 event.contract_address ===
-                  this.networkConfigs.get(Network.TRON)!.contractAddress,
+                  this.networkConfigs.get(Network.TRC20)!.contractAddress,
             ) || false;
-        } else if (network === Network.BSC) {
+        } else if (network === Network.BEP20) {
           const receipt = await this.providers
-            .get(Network.BSC)!
+            .get(Network.BEP20)!
             .getTransactionReceipt(transactionHash);
-          const contract = this.contracts.get(Network.BSC)!;
+          const contract = this.contracts.get(Network.BEP20)!;
           const transferEvents = await contract.queryFilter(
             contract.filters.Transfer(),
             receipt!.blockNumber,
