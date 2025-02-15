@@ -1,16 +1,16 @@
 {
-  "name": "tronwatch",
-  "version": "1.0.0",
-  "description": "A TRON network service that watches for USDT transactions on the blockchain, automates monitoring with webhook notifications.\"",
+  "name": "tether-watcher",
+  "version": "2.0.0",
+  "description": "A blockchain service that watches for USDT transactions on TRON and BSC networks, providing automated monitoring with webhook notifications.",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node dist/index.js",
-    "dev": "ts-node-dev src/index.ts",
+    "start": "cross-env NODE_ENV=production node dist/index.js",
+    "dev": "cross-env NODE_ENV=development ts-node-dev src/index.ts",
     "build": "tsc"
   },
   "keywords": [],
   "author": "Moha Abdi",
-  "license": "ISC",
+  "license": "MIT",
   "devDependencies": {
     "@types/express": "^5.0.0",
     "ts-node-dev": "^2.0.0",
@@ -20,12 +20,15 @@
     "@types/express-rate-limit": "^6.0.0",
     "axios": "^1.7.7",
     "bignumber.js": "^9.1.2",
+    "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
+    "ethers": "^6.13.5",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",
     "express-winston": "^4.2.0",
     "helmet": "^8.0.0",
     "tronweb": "^6.0.0",
+    "web3": "^4.16.0",
     "winston": "^3.14.2",
     "zod": "^3.23.8"
   }
