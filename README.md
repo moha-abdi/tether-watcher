@@ -1,26 +1,32 @@
-# TRON Transaction Watcher
+# TRON & BSC Transaction Watcher
 
-This is a service that watches for TRON (TRC20) USDT transactions and triggers a webhook when a specific transaction is completed or expired.
+This is a service that watches for USDT transactions on both TRON (TRC20) and BSC (BEP20) networks and triggers webhooks when specific transactions are completed, failed, or expired.
 
 > [!CAUTION]
-> This service is in its early stages of development and is expected to improve significantly over time. While it provides basic functionality for watching TRON (TRC20) USDT transactions, it should not be solely relied upon for production use at this stage. We recommend users to independently save transaction hashes to handle any cases in which transactions are resent by the webhook. Please stay tuned for future updates and improvements.
+> This service is in its early stages of development and is expected to improve significantly over time. While it provides functionality for watching USDT transactions on TRON and BSC networks, it should not be solely relied upon for production use at this stage. We recommend users to independently save transaction hashes to handle any cases in which transactions are resent by the webhook. Please stay tuned for future updates and improvements.
 
 ## Features
 
-- Watch TRC20 USDT transactions on the TRON network.
-- In-memory storage for watched transactions and processed events using JavaScript's `Map`.
-- Automatically sends webhooks for completed and expired transactions.
-- Uses `express` for routing, `helmet` for security, and `winston` for logging.
+- Watch USDT transactions on both TRON (TRC20) and BSC (BEP20) networks
+- In-memory storage for watched transactions and processed events using JavaScript's `Map`
+- Configurable confirmation requirements per network
+- Automatic retries for failed transactions
+- Comprehensive webhook notifications for transaction status changes
+- Supports both mainnet and testnet environments
+- Network-specific configuration (min/max amounts, block times, retry intervals)
+- Administrative API endpoints for network management
+- Monitoring endpoints for service health and statistics
 
 ## Technologies
 
 - **Node.js**
 - **Express.js**
-- **TronWeb** - To interact with the TRON blockchain.
-- **BigNumber.js** - For handling large numbers in transactions.
-- **Winston** - Logging framework.
-- **Axios** - For sending webhooks.
-- **Zod** - For validation.
+- **TronWeb** - To interact with the TRON blockchain
+- **Ethers.js** - To interact with the BSC blockchain
+- **BigNumber.js** - For handling large numbers in transactions
+- **Winston** - Logging framework
+- **Axios** - For sending webhooks
+- **Zod** - For request validation
 
 ## Setup
 
@@ -29,14 +35,16 @@ This is a service that watches for TRON (TRC20) USDT transactions and triggers a
 - Node.js v14+
 - NPM or Yarn
 - TRON API Key (for `TronWeb`)
+- TRON RPC URL (for mainnet/testnet)
+- BSC RPC URL (for mainnet/testnet)
 
 ### Installation
 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/moha-abdi/TronWatch.git
-   cd TronWatch
+   git clone https://github.com/moha-abdi/tether-watcher.git
+   cd tether-watcher
    ```
 
 2. Install the dependencies:
@@ -49,10 +57,22 @@ This is a service that watches for TRON (TRC20) USDT transactions and triggers a
 
    ```
    PORT=3000
-   TRON_FULL_HOST="https://api.trongrid.io"
+   NODE_ENV=development  # or production
+
+   # TRON Configuration
+   TRON_MAINNET_URL="https://api.trongrid.io"
+   TRON_TESTNET_URL="https://api.shasta.trongrid.io"
    TRON_PRO_API_KEY="your-tron-api-key"
-   USDT_CONTRACT_ADDRESS="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
-   USDT_DEPOSIT_ADDRESS="YOUR USDT TRC-20 ADDRESS"
+   TRON_MAINNET_CONTRACT="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+   TRON_TESTNET_CONTRACT="your-testnet-contract"
+
+   # BSC Configuration
+   BSC_MAINNET_URL="https://bsc-dataseed.binance.org"
+   BSC_TESTNET_URL="https://data-seed-prebsc-1-s1.binance.org:8545"
+   BSC_MAINNET_CONTRACT="0x55d398326f99059fF775485246999027B3197955"
+   BSC_TESTNET_CONTRACT="your-testnet-contract"
+
+   # Security
    API_KEY="your-secure-api-key"
    WEBHOOK_SECRET="your-secure-webhook-secret"
    ```
@@ -76,18 +96,21 @@ For development, use the following command to start the server with `ts-node-dev
 npm run dev
 ```
 
-### API Endpoints
+## API Endpoints
+
+### Transaction Management
 
 #### Add a Transaction to Watch
 
 **POST** `/api/watcher/watch`
 
 Request body:
-
 ```json
 {
   "id": "unique-transaction-id",
-  "fromAddress": "TRX-address",
+  "network": "TRON",  // or "BSC"
+  "fromAddress": "sender-address",
+  "expectedRecipientAddress": "recipient-address",
   "amount": 100,
   "webhookUrl": "https://yourwebhook.com/transaction"
 }
@@ -97,30 +120,53 @@ Request body:
 
 **DELETE** `/api/watcher/watch/:id`
 
-## How it Works
+#### Get Transaction Status
 
-1. **In-Memory Transactions**: The service stores watched transactions and processed events in memory using JavaScript's `Map` instead of Redis.
+**GET** `/api/watcher/watch/:id`
 
-2. **Watching Transactions**: The `TronWatcher` class listens for TRC20 `Transfer` events from the TRON network. If the transaction matches a watched one, a webhook is triggered.
+### Network Management
 
-3. **Expired Transactions**: Transactions are given a 5-minute window to be completed. If they expire, a webhook is sent notifying the user that the transaction has expired.
+#### Get All Networks Status
 
-4. **Webhook Notification**: When a transaction is completed or expired, the service sends a POST request to the provided webhook URL with details of the transaction.
+**GET** `/api/watcher/networks`
 
-### Webhook Signature
+#### Get Specific Network Status
 
-To ensure secure communication, each webhook request includes an `X-Webhook-Signature` header. The signature is generated using HMAC-SHA256 and a secret key (`WEBHOOK_SECRET`). This allows the receiving server to verify that the webhook request came from a trusted source.
+**GET** `/api/watcher/networks/:network`
 
-To generate the signature, the payload is hashed using the `WEBHOOK_SECRET`:
+## Webhook Notifications
+
+The service sends webhook notifications for the following transaction states:
+- COMPLETED: Transaction confirmed with required confirmations
+- FAILED: Transaction failed or exceeded maximum retry attempts
+- EXPIRED: Transaction not found within the expiration window
+
+Each webhook request includes:
+- Transaction ID
+- Network (TRON/BSC)
+- Status
+- Transaction hash (for completed transactions)
+- Block number (for completed transactions)
+- Number of confirmations (for completed transactions)
+- Error message (for failed transactions)
+- Network mode (testnet/mainnet)
+
+### Webhook Security
+
+Each webhook request includes an `X-Webhook-Signature` header for verification. The signature is generated using HMAC-SHA256 and your webhook secret:
 
 ```typescript
 import crypto from "crypto";
 
-function generateSignature(payload: string): string {
-  return crypto
+function verifyWebhookSignature(payload: string, signature: string): boolean {
+  const expectedSignature = crypto
     .createHmac("sha256", process.env.WEBHOOK_SECRET!)
     .update(payload)
     .digest("hex");
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
 }
 ```
 
