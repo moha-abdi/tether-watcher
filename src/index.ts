@@ -2,7 +2,7 @@ import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
-import { TronWatcher } from "./services/TronWatcher";
+import { TetherWatcher } from "./services/TetherWatcher";
 import { watcherRoutes } from "./routes/watcherRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 import { setupLogging } from "./utils/logger";
@@ -28,11 +28,11 @@ app.use(limiter);
 setupLogging(app);
 
 // Initialize TronWatcher
-const tronWatcher = new TronWatcher();
-tronWatcher.startWatchProcess();
+const tetherWatcher = new TetherWatcher(process.env.NODE_ENV === "development");
+tetherWatcher.startWatchProcess();
 
 // Routes
-app.use("/api/watcher", watcherRoutes(tronWatcher));
+app.use("/api/watcher", watcherRoutes(tetherWatcher));
 
 // Error handling
 app.use(errorHandler);
